@@ -1,5 +1,9 @@
 import utils.DirectoryScanner;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.InputStreamReader;
+import java.nio.file.Paths;
 import java.util.*;
 
 public class Main {
@@ -33,7 +37,7 @@ public class Main {
                 yield false;
             }
             default -> {
-                System.out.println(cmd + ": command not found");
+                runExternalCommand(cmd, arg);
                 yield false;
             }
         };
@@ -61,4 +65,48 @@ public class Main {
             System.out.println(arg + ": not found");
         }
     }
+
+    public static void runExternalCommand(String command, String arg) {
+        String path = System.getenv("PATH");
+        String found = DirectoryScanner.findExecutable(command, path);
+        if (found == null) {
+            System.out.println(command + ": command not found");
+            return;
+        }
+
+        String[] args = arg == null || arg.isBlank()
+                ? new String[0]
+                : arg.split("\\s+");
+        try {
+            runExternal(found, args);
+        } catch (Exception e) {
+            System.out.println(command + ": " + e.getMessage());
+            e.printStackTrace(System.out);
+        }
+    }
+
+    private static void runExternal(String execPath, String... args) throws Exception {
+        String execName = Paths.get(execPath).getFileName().toString();
+        List<String> command = new ArrayList<>();
+        command.add(execName);
+        command.addAll(Arrays.asList(args));
+
+        ProcessBuilder pb = new ProcessBuilder(command);
+        pb.directory(new File(execPath).getParentFile());
+        pb.redirectErrorStream(true);    // merge stderr into stdout
+
+        Process process = pb.start();
+
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(process.getInputStream()))) {
+
+            String line;
+            while ((line = reader.readLine()) != null) {
+                System.out.println(line);
+            }
+        }
+
+        int exitCode = process.waitFor();
+    }
+
 }
