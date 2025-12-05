@@ -6,8 +6,10 @@ import java.io.InputStreamReader;
 import java.nio.file.Paths;
 import java.util.*;
 
+import static utils.Constants.*;
+
 public class Main {
-    private static final Set<String> BUILTINS = Set.of("echo", "exit", "type", "pwd");
+    private static final Set<String> BUILTINS = Set.of(echo, exit, type, pwd, cd);
 
     public static void main(String[] args) {
         Scanner scanner = new Scanner(System.in);
@@ -27,17 +29,21 @@ public class Main {
         String arg = parts.length > 1 ? parts[1].trim() : "";
 
         return switch (cmd) {
-            case "exit" -> true;
-            case "echo" -> {
+            case exit -> true;
+            case echo -> {
                 System.out.println(arg);
                 yield false;
             }
-            case "type" -> {
+            case type -> {
                 handleType(arg);
                 yield false;
             }
-            case "pwd" -> {
+            case pwd -> {
                 System.out.println(DirectoryScanner.getWorkingDirectory());
+                yield false;
+            }
+            case cd -> {
+                DirectoryScanner.changeDirectory(arg);
                 yield false;
             }
             default -> {

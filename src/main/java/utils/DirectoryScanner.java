@@ -6,7 +6,10 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.regex.Pattern;
 
+import static utils.Constants.cd;
+
 public class DirectoryScanner {
+    private static String currentDir = Paths.get("").toAbsolutePath().toString();
     public static String findExecutable(String command, String pathList) {
         if (pathList == null || pathList.isBlank()) return null;
 
@@ -68,6 +71,17 @@ public class DirectoryScanner {
     }
 
     public static String getWorkingDirectory() {
-        return Paths.get("").toAbsolutePath().toString();
+        return currentDir;
+    }
+
+    public static void changeDirectory(String arg) {
+        if(StringUtils.startsWith(arg, "/")) {
+            Path path = Paths.get(arg);
+            if(Files.isDirectory(path)) {
+                currentDir = path.toAbsolutePath().toString();
+            } else {
+                System.out.println(cd + ": " + arg + ": No such file or directory");
+            }
+        }
     }
 }
