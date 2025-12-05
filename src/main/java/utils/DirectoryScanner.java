@@ -66,4 +66,8 @@ public class DirectoryScanner {
     public static boolean isExecutableFile(Path path) {
         return Files.isExecutable(path);
     }
+
+    public static String getWorkingDirectory() {
+        return Paths.get("").toAbsolutePath().toString();
+    }
 }

@@ -7,7 +7,7 @@ import java.nio.file.Paths;
 import java.util.*;
 
 public class Main {
-    private static final Set<String> BUILTINS = Set.of("echo", "exit", "type");
+    private static final Set<String> BUILTINS = Set.of("echo", "exit", "type", "pwd");
 
     public static void main(String[] args) {
         Scanner scanner = new Scanner(System.in);
@@ -34,6 +34,10 @@ public class Main {
             }
             case "type" -> {
                 handleType(arg);
+                yield false;
+            }
+            case "pwd" -> {
+                System.out.println(DirectoryScanner.getWorkingDirectory());
                 yield false;
             }
             default -> {
@@ -105,8 +109,6 @@ public class Main {
                 System.out.println(line);
             }
         }
-
-        int exitCode = process.waitFor();
     }
 
 }
