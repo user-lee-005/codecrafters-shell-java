@@ -74,10 +74,38 @@ public class DirectoryScanner {
         return currentDir;
     }
 
+    public static boolean isDirectory(Path path) {
+        if(path == null) {
+            return false;
+        }
+        return Files.isDirectory(path);
+    }
+
     public static void changeDirectory(String arg) {
-        if(StringUtils.startsWith(arg, "/")) {
-            Path path = Paths.get(arg);
-            if(Files.isDirectory(path)) {
+        Path resolved = resolvePath(arg, currentDir);
+        changeCurrentDirectory(arg, resolved);
+    }
+
+    private static Path resolvePath(String arg, String currentDir) {
+        Path base = Paths.get(currentDir);
+        if (arg.startsWith("~")) {
+            return Paths.get(System.getProperty("user.home"))
+                    .resolve(arg.substring(1))
+                    .normalize();
+        }
+
+        if (arg.startsWith("/")) {
+            return Paths.get(arg).normalize();
+        }
+
+        return base.resolve(arg).normalize();
+    }
+
+    private static void changeCurrentDirectory(String arg, Path path) {
+        if(path == null) {
+            currentDir = Paths.get("/").getRoot().toAbsolutePath().toString();
+        } else {
+            if(isDirectory(path)) {
                 currentDir = path.toAbsolutePath().toString();
             } else {
                 System.out.println(cd + ": " + arg + ": No such file or directory");
