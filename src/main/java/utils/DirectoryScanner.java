@@ -89,7 +89,7 @@ public class DirectoryScanner {
     private static Path resolvePath(String arg, String currentDir) {
         Path base = Paths.get(currentDir);
         if (arg.startsWith("~")) {
-            return Paths.get(System.getProperty("user.home"))
+            return Paths.get(System.getenv("HOME"))
                     .resolve(arg.substring(1))
                     .normalize();
         }
