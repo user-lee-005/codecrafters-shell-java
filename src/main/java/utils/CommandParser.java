@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class CommandParser {
+    private static final List<Character> escapeInsideDoubleQuotes = List.of('\\', '"', '$', '`');
     private static List<String> tokenizeShellCommand(String input) {
         List<String> result = new ArrayList<>();
         StringBuilder current = new StringBuilder();
@@ -21,10 +22,29 @@ public class CommandParser {
                 continue;
             }
 
-            if (c == '\\' && !inSingleQuotes) {
+            if (c == '\\') {
+                if (inSingleQuotes) {
+                    current.append('\\');
+                    continue;
+                }
+
+                if (inDoubleQuotes) {
+                    if (i + 1 < input.length()) {
+                        char next = input.charAt(i + 1);
+                        if (next == '"' || next == '$' || next == '`' || next == '\\') {
+                            current.append(next);
+                            i++;
+                            continue;
+                        }
+                    }
+                    current.append('\\');
+                    continue;
+                }
+
                 escaped = true;
                 continue;
             }
+
 
             if (c == '\'' && !inDoubleQuotes) {
                 inSingleQuotes = !inSingleQuotes;
@@ -33,7 +53,7 @@ public class CommandParser {
 
             if (c == '"' && !inSingleQuotes) {
                 inDoubleQuotes = !inDoubleQuotes;
-                continue; // don't append quote char
+                continue;
             }
 
             if (Character.isWhitespace(c) && !inSingleQuotes && !inDoubleQuotes) {
