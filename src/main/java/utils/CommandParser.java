@@ -9,6 +9,7 @@ public class CommandParser {
         StringBuilder current = new StringBuilder();
 
         boolean inSingleQuotes = false;
+        boolean inDoubleQuotes = false;
         boolean escaped = false;
 
         for (int i = 0; i < input.length(); i++) {
@@ -17,30 +18,41 @@ public class CommandParser {
             if (escaped) {
                 current.append(c);
                 escaped = false;
-            } else if (c == '\\') {
+                continue;
+            }
+
+            if (c == '\\' && !inSingleQuotes) {
                 escaped = true;
-            } else if (c == '\'' && !inSingleQuotes) {
-                inSingleQuotes = true;
-            } else if (c == '\'') {
-                inSingleQuotes = false;
-            } else if (Character.isWhitespace(c) && !inSingleQuotes) {
+                continue;
+            }
+
+            if (c == '\'' && !inDoubleQuotes) {
+                inSingleQuotes = !inSingleQuotes;
+                continue;
+            }
+
+            if (c == '"' && !inSingleQuotes) {
+                inDoubleQuotes = !inDoubleQuotes;
+                continue; // don't append quote char
+            }
+
+            if (Character.isWhitespace(c) && !inSingleQuotes && !inDoubleQuotes) {
                 if (!current.isEmpty()) {
                     result.add(current.toString());
                     current.setLength(0);
                 }
-            } else {
-                current.append(c);
+                continue;
             }
+
+            current.append(c);
         }
 
         if (escaped) current.append('\\');
-
-        if (!current.isEmpty()) {
-            result.add(current.toString());
-        }
+        if (!current.isEmpty()) result.add(current.toString());
 
         return result;
     }
+
 
     public static ParsedCommand parseCommand(String command) {
         List<String> tokens = tokenizeShellCommand(command);
