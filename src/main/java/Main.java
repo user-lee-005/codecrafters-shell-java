@@ -1,4 +1,5 @@
 import utils.DirectoryScanner;
+import utils.ParsedCommand;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -6,6 +7,7 @@ import java.io.InputStreamReader;
 import java.nio.file.Paths;
 import java.util.*;
 
+import static utils.CommandParser.parseCommand;
 import static utils.Constants.*;
 
 public class Main {
@@ -24,18 +26,17 @@ public class Main {
     }
 
     private static boolean execute(String input) {
-        String[] parts = input.split("\\s+", 2);
-        String cmd = parts[0];
-        String arg = parts.length > 1 ? parts[1].trim() : "";
-
+        ParsedCommand parsedCommand = parseCommand(input);
+        String cmd = parsedCommand.command();
+        List<String> args = parsedCommand.args();
         return switch (cmd) {
             case exit -> true;
             case echo -> {
-                System.out.println(arg);
+                System.out.println(String.join(" ", args));
                 yield false;
             }
             case type -> {
-                handleType(arg);
+                handleType(args.getFirst());
                 yield false;
             }
             case pwd -> {
@@ -43,11 +44,11 @@ public class Main {
                 yield false;
             }
             case cd -> {
-                DirectoryScanner.changeDirectory(arg);
+                DirectoryScanner.changeDirectory(args);
                 yield false;
             }
             default -> {
-                runExternalCommand(cmd, arg);
+                runExternalCommand(cmd, args);
                 yield false;
             }
         };
@@ -76,34 +77,31 @@ public class Main {
         }
     }
 
-    public static void runExternalCommand(String command, String arg) {
+    public static void runExternalCommand(String command, List<String> args) {
         String path = System.getenv("PATH");
         String found = DirectoryScanner.findExecutable(command, path);
+
         if (found == null) {
             System.out.println(command + ": command not found");
             return;
         }
 
-        String[] args = arg == null || arg.isBlank()
-                ? new String[0]
-                : arg.split("\\s+");
         try {
             runExternal(found, args);
         } catch (Exception e) {
             System.out.println(command + ": " + e.getMessage());
-            e.printStackTrace(System.out);
         }
     }
 
-    private static void runExternal(String execPath, String... args) throws Exception {
+    private static void runExternal(String execPath, List<String> args) throws Exception {
         String execName = Paths.get(execPath).getFileName().toString();
         List<String> command = new ArrayList<>();
         command.add(execName);
-        command.addAll(Arrays.asList(args));
+        command.addAll(args);
 
         ProcessBuilder pb = new ProcessBuilder(command);
         pb.directory(new File(execPath).getParentFile());
-        pb.redirectErrorStream(true);    // merge stderr into stdout
+        pb.redirectErrorStream(true);
 
         Process process = pb.start();
 

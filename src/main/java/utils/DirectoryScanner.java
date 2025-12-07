@@ -4,6 +4,7 @@ import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
 import java.util.regex.Pattern;
 
 import static utils.Constants.cd;
@@ -53,23 +54,6 @@ public class DirectoryScanner {
         return null;
     }
 
-    public static String findExecutableIfPresentInPath(String path, String command) {
-        String separator = File.pathSeparator;
-        for(String dir: path.split(Pattern.quote(separator))) {
-            Path folder = Paths.get(dir);
-            if(!Files.isDirectory(folder)) continue;
-            Path target = folder.resolve(command);
-            if(Files.exists(target) && isExecutableFile(target)) {
-                return target.toString();
-            }
-        }
-        return null;
-    }
-
-    public static boolean isExecutableFile(Path path) {
-        return Files.isExecutable(path);
-    }
-
     public static String getWorkingDirectory() {
         return currentDir;
     }
@@ -81,7 +65,8 @@ public class DirectoryScanner {
         return Files.isDirectory(path);
     }
 
-    public static void changeDirectory(String arg) {
+    public static void changeDirectory(List<String> args) {
+        String arg = args.getFirst();
         Path resolved = resolvePath(arg, currentDir);
         changeCurrentDirectory(arg, resolved);
     }
