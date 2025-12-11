@@ -7,7 +7,7 @@ import java.nio.file.Paths;
 import java.util.List;
 import java.util.regex.Pattern;
 
-import static utils.Constants.cd;
+import static constants.Constants.cd;
 
 public class DirectoryScanner {
     private static String currentDir = Paths.get("").toAbsolutePath().toString();

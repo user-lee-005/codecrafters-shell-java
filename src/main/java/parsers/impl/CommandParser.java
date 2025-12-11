@@ -1,10 +1,15 @@
-package utils;
+package parsers.impl;
+
+import dto.ParsedCommand;
+import parsers.Parser;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public class CommandParser {
-    private static final List<Character> escapeInsideDoubleQuotes = List.of('\\', '"', '$', '`');
+import static constants.Constants.redirectOperator;
+import static constants.Constants.redirectOperator1;
+
+public class CommandParser implements Parser {
     private static List<String> tokenizeShellCommand(String input) {
         List<String> result = new ArrayList<>();
         StringBuilder current = new StringBuilder();
@@ -74,8 +79,16 @@ public class CommandParser {
     }
 
 
-    public static ParsedCommand parseCommand(String command) {
+    @Override
+    public ParsedCommand parseCommand(String command) {
         List<String> tokens = tokenizeShellCommand(command);
-        return new ParsedCommand(tokens.getFirst(), tokens.subList(1, tokens.size()));
+        int redirectOutputIndex = -1;
+        String redirectFile = null;
+        if(tokens.contains(redirectOperator) || tokens.contains(redirectOperator1)) {
+            redirectOutputIndex = tokens.indexOf(redirectOperator);
+            if(redirectOutputIndex == -1) redirectOutputIndex = tokens.indexOf(redirectOperator1);
+            redirectFile = tokens.get(redirectOutputIndex + 1);
+        }
+        return new ParsedCommand(tokens.getFirst(), tokens.subList(1, redirectOutputIndex == -1 ? tokens.size() : redirectOutputIndex), redirectFile);
     }
 }
