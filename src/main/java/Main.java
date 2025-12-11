@@ -1,11 +1,9 @@
 import handlers.CommandRegistry;
 import parsers.Parser;
 import parsers.impl.CommandParser;
-import utils.DirectoryScanner;
 import dto.ParsedCommand;
 
 import java.io.*;
-import java.nio.file.Paths;
 import java.util.*;
 
 import static constants.Constants.*;

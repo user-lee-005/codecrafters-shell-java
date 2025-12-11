@@ -1,15 +1,18 @@
 package parsers.impl;
 
 import dto.ParsedCommand;
+import handlers.CommandRegistry;
 import parsers.Parser;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
-import static constants.Constants.redirectOperator;
-import static constants.Constants.redirectOperator1;
+import static constants.Constants.*;
 
 public class CommandParser implements Parser {
+    private Set<String> redirectOperators = Set.of(redirectOperator1, redirectOperator2, redirectOperator);
     private static List<String> tokenizeShellCommand(String input) {
         List<String> result = new ArrayList<>();
         StringBuilder current = new StringBuilder();
@@ -83,12 +86,23 @@ public class CommandParser implements Parser {
     public ParsedCommand parseCommand(String command) {
         List<String> tokens = tokenizeShellCommand(command);
         int redirectOutputIndex = -1;
-        String redirectFile = null;
-        if(tokens.contains(redirectOperator) || tokens.contains(redirectOperator1)) {
-            redirectOutputIndex = tokens.indexOf(redirectOperator);
-            if(redirectOutputIndex == -1) redirectOutputIndex = tokens.indexOf(redirectOperator1);
-            redirectFile = tokens.get(redirectOutputIndex + 1);
+        String stdErrRedirectFile = null;
+        String stdOutRedirectFile = null;
+        boolean redirectError = false;
+        for(int i = 0; i < tokens.size(); i ++) {
+            if(redirectOperators.contains(tokens.get(i))) {
+                if (redirectOperator2.equals(tokens.get(i))) {
+                    redirectError = true;
+                    stdErrRedirectFile = tokens.get(i + 1);
+                } else  {
+                    stdOutRedirectFile = tokens.get(i + 1);
+                }
+                redirectOutputIndex = i;
+                break;
+            }
         }
-        return new ParsedCommand(tokens.getFirst(), tokens.subList(1, redirectOutputIndex == -1 ? tokens.size() : redirectOutputIndex), redirectFile);
+        return new ParsedCommand(tokens.getFirst(),
+                tokens.subList(1, redirectOutputIndex == -1 ? tokens.size() : redirectOutputIndex),
+                stdOutRedirectFile, stdErrRedirectFile, redirectError);
     }
 }

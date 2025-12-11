@@ -3,10 +3,7 @@ package handlers;
 import dto.ParsedCommand;
 import utils.DirectoryScanner;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.InputStreamReader;
-import java.io.PrintStream;
+import java.io.*;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
@@ -15,12 +12,13 @@ import java.util.Map;
 import static constants.Constants.*;
 
 public class CommandRegistry {
-    private static final Map<String, CommandHandler> handlers = Map.of(
+    public static final Map<String, CommandHandler> handlers = Map.of(
         echo, (parsedCommand, printStream) -> printStream.println(String.join(" ", parsedCommand.args())),
         pwd, (_, printStream) -> printStream.println(DirectoryScanner.getWorkingDirectory()),
         type, (parsedCommand, printStream) -> handleType(parsedCommand.args().getFirst(), printStream),
         cd, (parsedCommand, _) -> DirectoryScanner.changeDirectory(parsedCommand.args())
     );
+
 
     private static void handleType(String arg, PrintStream printStream) {
         if (arg.isEmpty()) {
@@ -45,8 +43,9 @@ public class CommandRegistry {
         }
     }
 
-    public static void runExternalCommand(String command, List<String> args, PrintStream printStream) {
+    public static void runExternalCommand(ParsedCommand parsedCommand, PrintStream printStream) {
         String path = System.getenv("PATH");
+        String command = parsedCommand.command();
         String found = DirectoryScanner.findExecutable(command, path);
 
         if (found == null) {
@@ -55,21 +54,25 @@ public class CommandRegistry {
         }
 
         try {
-            runExternal(found, args, printStream);
+            runExternal(found, parsedCommand, printStream);
         } catch (Exception e) {
             printStream.println(command + ": " + e.getMessage());
         }
     }
 
-    private static void runExternal(String execPath, List<String> args, PrintStream printStream) throws Exception {
+    private static void runExternal(String execPath, ParsedCommand parsedCommand, PrintStream printStream) throws Exception {
         String execName = Paths.get(execPath).getFileName().toString();
         List<String> command = new ArrayList<>();
         command.add(execName);
-        command.addAll(args);
+        command.addAll(parsedCommand.args());
 
         ProcessBuilder pb = new ProcessBuilder(command);
         pb.directory(new File(execPath).getParentFile());
-        pb.redirectError(ProcessBuilder.Redirect.INHERIT);
+        if (parsedCommand.stdErrRedirectFile() != null) {
+            pb.redirectError(new File(parsedCommand.stdErrRedirectFile()));
+        } else {
+            pb.redirectError(ProcessBuilder.Redirect.INHERIT);
+        }
 
         Process process = pb.start();
 
@@ -86,9 +89,16 @@ public class CommandRegistry {
     public static void run(ParsedCommand parsedCommand, PrintStream printStream) {
         CommandHandler handler = handlers.get(parsedCommand.command());
         if(handler != null) {
+            if (parsedCommand.redirectError() && parsedCommand.isBuiltIn() && parsedCommand.stdErrRedirectFile() != null) {
+                try {
+                    new FileOutputStream(parsedCommand.stdErrRedirectFile()).close();
+                } catch (IOException e) {
+                    System.err.println(e.getMessage());
+                }
+            }
             handler.handle(parsedCommand, printStream);
-        } else {
-            runExternalCommand(parsedCommand.command(), parsedCommand.args(), printStream);
+            return;
         }
+        runExternalCommand(parsedCommand, printStream);
     }
 }

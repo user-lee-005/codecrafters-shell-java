@@ -1,5 +1,6 @@
 package dto;
 
+import handlers.CommandRegistry;
 import handlers.ConsoleOutput;
 import handlers.FileOutput;
 import handlers.OutputProvider;
@@ -9,17 +10,30 @@ import java.util.Objects;
 
 import static constants.Constants.exit;
 
-public record ParsedCommand(String command, List<String> args, String redirectFile) {
+public record ParsedCommand(String command,
+                            List<String> args,
+                            String stdOutRedirectFile,
+                            String stdErrRedirectFile,
+                            boolean redirectError) {
 
     public boolean isExit() {
         return exit.equals(command);
     }
 
+    public boolean isBuiltIn() {
+        return CommandRegistry.handlers.containsKey(command);
+    }
+
+    /**
+     * echo is a builtin
+     * Your builtin echo writes to stdout, not stderr
+     * return Console as PrintStream if the command is built-in
+     * */
     public OutputProvider outputStrategy() {
-        if(redirectFile == null) {
-            return new ConsoleOutput();
+        if (stdOutRedirectFile != null) {
+            return new FileOutput(stdOutRedirectFile);
         }
-        return new FileOutput(redirectFile);
+        return new ConsoleOutput();
     }
 
     @Override
