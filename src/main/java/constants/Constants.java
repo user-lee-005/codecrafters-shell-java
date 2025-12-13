@@ -10,6 +10,8 @@ public class Constants {
 
 
     public static final String redirectOperator = ">";
+    public static final String redirectAndAppendOperator = ">>";
+    public static final String redirectAndAppendOperator1 = "1>>";
     public static final String redirectOperator1 = "1>";
     public static final String redirectOperator2 = "2>";
 }

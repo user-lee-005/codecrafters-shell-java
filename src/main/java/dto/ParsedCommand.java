@@ -8,20 +8,17 @@ import handlers.OutputProvider;
 import java.util.List;
 import java.util.Objects;
 
-import static constants.Constants.exit;
+import static constants.Constants.*;
 
 public record ParsedCommand(String command,
                             List<String> args,
                             String stdOutRedirectFile,
                             String stdErrRedirectFile,
-                            boolean redirectError) {
+                            boolean redirectError,
+                            boolean append) {
 
     public boolean isExit() {
         return exit.equals(command);
-    }
-
-    public boolean isBuiltIn() {
-        return CommandRegistry.handlers.containsKey(command);
     }
 
     /**
@@ -31,7 +28,7 @@ public record ParsedCommand(String command,
      * */
     public OutputProvider outputStrategy() {
         if (stdOutRedirectFile != null) {
-            return new FileOutput(stdOutRedirectFile);
+            return new FileOutput(stdOutRedirectFile, append);
         }
         return new ConsoleOutput();
     }

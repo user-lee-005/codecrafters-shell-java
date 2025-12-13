@@ -1,18 +1,17 @@
 package parsers.impl;
 
 import dto.ParsedCommand;
-import handlers.CommandRegistry;
 import parsers.Parser;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
 import static constants.Constants.*;
 
 public class CommandParser implements Parser {
-    private Set<String> redirectOperators = Set.of(redirectOperator1, redirectOperator2, redirectOperator);
+    private final Set<String> redirectOperators = Set.of(redirectOperator1, redirectOperator2, redirectOperator,
+            redirectAndAppendOperator, redirectAndAppendOperator1);
     private static List<String> tokenizeShellCommand(String input) {
         List<String> result = new ArrayList<>();
         StringBuilder current = new StringBuilder();
@@ -89,8 +88,12 @@ public class CommandParser implements Parser {
         String stdErrRedirectFile = null;
         String stdOutRedirectFile = null;
         boolean redirectError = false;
+        boolean append = false;
         for(int i = 0; i < tokens.size(); i ++) {
             if(redirectOperators.contains(tokens.get(i))) {
+                if (tokens.get(i).equals(">>") || tokens.get(i).matches("1>>")) {
+                    append = true;
+                }
                 if (redirectOperator2.equals(tokens.get(i))) {
                     redirectError = true;
                     stdErrRedirectFile = tokens.get(i + 1);
@@ -103,6 +106,6 @@ public class CommandParser implements Parser {
         }
         return new ParsedCommand(tokens.getFirst(),
                 tokens.subList(1, redirectOutputIndex == -1 ? tokens.size() : redirectOutputIndex),
-                stdOutRedirectFile, stdErrRedirectFile, redirectError);
+                stdOutRedirectFile, stdErrRedirectFile, redirectError, append);
     }
 }

@@ -12,7 +12,7 @@ import java.util.Map;
 import static constants.Constants.*;
 
 public class CommandRegistry {
-    public static final Map<String, CommandHandler> handlers = Map.of(
+    private static final Map<String, CommandHandler> handlers = Map.of(
         echo, (parsedCommand, printStream) -> printStream.println(String.join(" ", parsedCommand.args())),
         pwd, (_, printStream) -> printStream.println(DirectoryScanner.getWorkingDirectory()),
         type, (parsedCommand, printStream) -> handleType(parsedCommand.args().getFirst(), printStream),
@@ -89,7 +89,8 @@ public class CommandRegistry {
     public static void run(ParsedCommand parsedCommand, PrintStream printStream) {
         CommandHandler handler = handlers.get(parsedCommand.command());
         if(handler != null) {
-            if (parsedCommand.redirectError() && parsedCommand.isBuiltIn() && parsedCommand.stdErrRedirectFile() != null) {
+            if (parsedCommand.redirectError()
+                    && parsedCommand.stdErrRedirectFile() != null) {
                 try {
                     new FileOutputStream(parsedCommand.stdErrRedirectFile()).close();
                 } catch (IOException e) {
