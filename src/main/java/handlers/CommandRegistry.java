@@ -69,7 +69,11 @@ public class CommandRegistry {
         ProcessBuilder pb = new ProcessBuilder(command);
         pb.directory(new File(execPath).getParentFile());
         if (parsedCommand.stdErrRedirectFile() != null) {
-            pb.redirectError(new File(parsedCommand.stdErrRedirectFile()));
+            pb.redirectError(parsedCommand.append() ?
+                    ProcessBuilder.Redirect.appendTo(
+                            new File(parsedCommand.stdErrRedirectFile()))
+                    : ProcessBuilder.Redirect.to(new File(parsedCommand.stdErrRedirectFile()))
+            );
         } else {
             pb.redirectError(ProcessBuilder.Redirect.INHERIT);
         }
@@ -89,10 +93,9 @@ public class CommandRegistry {
     public static void run(ParsedCommand parsedCommand, PrintStream printStream) {
         CommandHandler handler = handlers.get(parsedCommand.command());
         if(handler != null) {
-            if (parsedCommand.redirectError()
-                    && parsedCommand.stdErrRedirectFile() != null) {
+            if (parsedCommand.stdErrRedirectFile() != null) {
                 try {
-                    new FileOutputStream(parsedCommand.stdErrRedirectFile()).close();
+                    new FileOutputStream(parsedCommand.stdErrRedirectFile(), parsedCommand.append()).close();
                 } catch (IOException e) {
                     System.err.println(e.getMessage());
                 }

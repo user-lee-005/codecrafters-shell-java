@@ -11,7 +11,7 @@ import static constants.Constants.*;
 
 public class CommandParser implements Parser {
     private final Set<String> redirectOperators = Set.of(redirectOperator1, redirectOperator2, redirectOperator,
-            redirectAndAppendOperator, redirectAndAppendOperator1);
+            redirectAndAppendOperator, redirectAndAppendOperator1, redirectAndAppendOperator2);
     private static List<String> tokenizeShellCommand(String input) {
         List<String> result = new ArrayList<>();
         StringBuilder current = new StringBuilder();
@@ -91,10 +91,13 @@ public class CommandParser implements Parser {
         boolean append = false;
         for(int i = 0; i < tokens.size(); i ++) {
             if(redirectOperators.contains(tokens.get(i))) {
-                if (tokens.get(i).equals(">>") || tokens.get(i).matches("1>>")) {
+                if (tokens.get(i).equals(redirectAndAppendOperator)
+                        || tokens.get(i).matches(redirectAndAppendOperator1)
+                        || tokens.get(i).matches(redirectAndAppendOperator2)) {
                     append = true;
                 }
-                if (redirectOperator2.equals(tokens.get(i))) {
+                if (redirectOperator2.equals(tokens.get(i))
+                        || tokens.get(i).matches(redirectAndAppendOperator2)) {
                     redirectError = true;
                     stdErrRedirectFile = tokens.get(i + 1);
                 } else  {
