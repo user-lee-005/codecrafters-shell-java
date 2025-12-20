@@ -5,6 +5,8 @@ import terminal.buffer.InputBuffer;
 import terminal.renderer.CompletionEngine;
 import terminal.renderer.Renderer;
 
+import java.util.Optional;
+
 public class InputController {
 
     private final InputBuffer buffer;
@@ -45,12 +47,16 @@ public class InputController {
 
     private void handleTab() {
         String content = buffer.content();
+        Optional<String> completedString = completionEngine.complete(content);
+        if(completedString.isEmpty()) {
+            buffer.append("\u0007");
+            renderer.printString("\u0007");
+            return;
+        }
 
         completionEngine.complete(content).ifPresent(completion -> {
             String suffix = completion.substring(content.length());
-
             buffer.append(suffix);
-
             renderer.printString(suffix);
         });
     }
