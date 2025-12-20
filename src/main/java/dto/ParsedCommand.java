@@ -1,6 +1,5 @@
 package dto;
 
-import handlers.CommandRegistry;
 import handlers.ConsoleOutput;
 import handlers.FileOutput;
 import handlers.OutputProvider;
