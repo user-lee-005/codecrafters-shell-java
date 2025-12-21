@@ -224,6 +224,7 @@ public class CommandRegistry {
         try {
             Path path = Path.of(filePath);
             if(append) {
+                System.out.println(historyState);
                 if (lastSavedHistoryIndex < historyState.size()) {
                     List<String> newCommands = historyState.subList(lastSavedHistoryIndex, historyState.size());
                     Files.write(path, newCommands, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
