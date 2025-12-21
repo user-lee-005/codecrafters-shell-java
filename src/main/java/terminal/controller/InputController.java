@@ -44,6 +44,8 @@ public class InputController {
             }
 
             case ENTER -> {
+                List<String> history = CommandRegistry.getHistory();
+                if(historyIndex > 0 && historyIndex < history.size()) buffer.append(history.get(historyIndex));
                 renderer.newLine();
             }
 
