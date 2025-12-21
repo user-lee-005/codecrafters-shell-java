@@ -22,6 +22,8 @@ public class Main {
         Renderer renderer = TerminalFactory.createRenderer();
         InputController controller = new InputController(buffer, renderer);
         terminal.enableRawMode();
+        final String HISTFILE = System.getenv("HISTFILE");
+        CommandRegistry.readHistoryFromFile(HISTFILE);
         try {
             while (true) {
                 System.out.print("$ ");
@@ -45,6 +47,7 @@ public class Main {
                 if (executeAndExit(input)) break;
             }
         } finally {
+            CommandRegistry.writeHistoryToFile(HISTFILE, true);
             terminal.disableRawMode();
         }
     }

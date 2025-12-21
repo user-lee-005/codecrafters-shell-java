@@ -7,10 +7,13 @@ import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static constants.Constants.*;
@@ -26,6 +29,7 @@ public class CommandRegistry {
     );
 
     private static final List<String> historyState = new ArrayList<>();
+    private static int lastSavedHistoryIndex = 0;
 
     public static void addToHistory(String input) {
         historyState.add(input);
@@ -177,7 +181,7 @@ public class CommandRegistry {
     }
 
     private static void handleHistory(ParsedCommand cmd, PrintStream printStream) {
-        Set<String> historyOptions = Set.of("-r");
+        Set<String> historyOptions = Set.of("-r", "-w", "-a");
         if(historyState.isEmpty()) return;
         StringBuilder sb = new StringBuilder();
         int historySize = historyState.size();
@@ -185,11 +189,15 @@ public class CommandRegistry {
             String arg = cmd.args().getFirst();
             if(historyOptions.contains(arg)) {
                 if("-r".equals(arg)) {
-                    try (Stream<String> stream = Files.lines(Path.of(cmd.args().get(1)))) {
-                        stream.forEach(historyState::add);
-                    } catch (IOException e) {
-                        System.out.println("cat: " + cmd.args().get(1) + ": No such file or directory");
-                    }
+                    readHistoryFromFile(cmd.args().get(1));
+                    return;
+                }
+                if("-w".equals(arg)) {
+                    writeHistoryToFile(cmd.args().get(1), false);
+                    return;
+                }
+                if("-a".equals(arg)) {
+                    writeHistoryToFile(cmd.args().get(1), true);
                     return;
                 }
             } else {
@@ -200,5 +208,34 @@ public class CommandRegistry {
             sb.append(String.format("%5d  %s%n", i + 1, historyState.get(i)));
         }
         printStream.print(sb);
+    }
+
+    public static void readHistoryFromFile(String filePath) {
+        if(filePath == null) return;
+        try (Stream<String> stream = Files.lines(Path.of(filePath))) {
+            stream.forEach(historyState::add);
+        } catch (IOException e) {
+            System.out.println("history: " + filePath + ": No such file or directory");
+        }
+    }
+
+    public static void writeHistoryToFile(String filePath, boolean append) {
+        if(filePath == null) return;
+        try {
+            Path path = Path.of(filePath);
+            if(append) {
+                if (lastSavedHistoryIndex < historyState.size()) {
+                    List<String> newCommands = historyState.subList(lastSavedHistoryIndex, historyState.size());
+                    Files.write(path, newCommands, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+                    lastSavedHistoryIndex = historyState.size();
+                }
+            }
+            else {
+                Files.write(path, historyState, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+                lastSavedHistoryIndex = historyState.size();
+            }
+        } catch (IOException e) {
+            System.out.println("history: " + filePath + ": " + e.getMessage());
+        }
     }
 }
