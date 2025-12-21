@@ -49,6 +49,7 @@ public class Main {
     }
 
     private static boolean executeAndExit(String input) throws IOException {
+        CommandRegistry.addToHistory(input);
         List<ParsedCommand> parsedCommands = getParsedCommands(input);
         if(parsedCommands.getFirst().isExit()) return true;
         PrintStream printStream = parsedCommands.getFirst().outputStrategy().get();
