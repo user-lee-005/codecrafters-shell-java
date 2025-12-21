@@ -6,7 +6,6 @@ import utils.DirectoryScanner;
 import java.io.*;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
@@ -19,7 +18,7 @@ public class CommandRegistry {
             cd, (cmd, _, _) -> DirectoryScanner.changeDirectory(cmd.args()),
             type, (cmd, _, out) -> handleType(cmd.args().isEmpty() ? "" : cmd.args().getFirst(), out),
             exit, (_, _, _) -> System.exit(0),
-            history, (_, _, out) -> handleHistory(out)
+            history, (cmd, _, out) -> handleHistory(cmd, out)
     );
 
     private static final List<String> historyState = new ArrayList<>();
@@ -169,12 +168,12 @@ public class CommandRegistry {
         else printStream.println(arg + ": not found");
     }
 
-    private static void handleHistory(PrintStream printStream) {
+    private static void handleHistory(ParsedCommand cmd, PrintStream printStream) {
         if(historyState.isEmpty()) return;
         StringBuilder sb = new StringBuilder();
-        int index = 1;
-        for (String cmd : historyState) {
-            sb.append(String.format("%5d  %s%n", index++, cmd));
+        int historySize = cmd.args().isEmpty() ? historyState.size() : Integer.parseInt(cmd.args().getFirst());
+        for (int i = historyState.size() - historySize; i < historyState.size(); i++) {
+            sb.append(String.format("%5d  %s%n", i + 1, historyState.get(i)));
         }
         printStream.print(sb);
     }
