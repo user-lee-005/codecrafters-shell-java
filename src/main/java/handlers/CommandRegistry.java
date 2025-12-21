@@ -12,8 +12,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Pattern;
-import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static constants.Constants.*;
@@ -214,6 +212,7 @@ public class CommandRegistry {
         if(filePath == null) return;
         try (Stream<String> stream = Files.lines(Path.of(filePath))) {
             stream.forEach(historyState::add);
+            lastSavedHistoryIndex = historyState.size();
         } catch (IOException e) {
             System.out.println("history: " + filePath + ": No such file or directory");
         }
@@ -224,7 +223,6 @@ public class CommandRegistry {
         try {
             Path path = Path.of(filePath);
             if(append) {
-                System.out.println(historyState);
                 if (lastSavedHistoryIndex < historyState.size()) {
                     List<String> newCommands = historyState.subList(lastSavedHistoryIndex, historyState.size());
                     Files.write(path, newCommands, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
