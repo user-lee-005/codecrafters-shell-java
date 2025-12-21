@@ -1,10 +1,14 @@
 package utils;
 
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 import static constants.Constants.cd;
@@ -96,5 +100,61 @@ public class DirectoryScanner {
                 System.out.println(cd + ": " + arg + ": No such file or directory");
             }
         }
+    }
+
+    public static Set<String> findAllExecutablesInPath() {
+        String pathList = System.getenv("PATH");
+        Set<String> executableNames = new HashSet<>();
+
+        if (pathList == null || pathList.isBlank()) {
+            return executableNames;
+        }
+
+        String separator = File.pathSeparator;
+        String[] dirs = pathList.split(Pattern.quote(separator));
+
+        boolean isWindows = System.getProperty("os.name").toLowerCase().contains("win");
+
+        // Extensions to consider "executable" on Windows
+        // (You could also read the PATHEXT environment variable for better accuracy)
+        Set<String> windowsExtensions = Set.of(".exe", ".bat", ".cmd", ".com");
+
+        for (String dir : dirs) {
+            Path folder = Paths.get(dir);
+
+            // Skip invalid paths or non-directories
+            if (!Files.exists(folder) || !Files.isDirectory(folder)) {
+                continue;
+            }
+
+            // Use DirectoryStream to lazily iterate over files (better performance)
+            try (DirectoryStream<Path> stream = Files.newDirectoryStream(folder)) {
+                for (Path entry : stream) {
+                    // We only care about files, not sub-directories
+                    if (!Files.isRegularFile(entry)) continue;
+
+                    if (isWindows) {
+                        // On Windows, check if the file ends with a known executable extension
+                        String fileName = entry.getFileName().toString().toLowerCase();
+                        int lastDot = fileName.lastIndexOf('.');
+                        if (lastDot > 0) {
+                            String ext = fileName.substring(lastDot);
+                            if (windowsExtensions.contains(ext)) {
+                                executableNames.add(entry.getFileName().toString());
+                            }
+                        }
+                    } else {
+                        // On Linux/Mac, check the executable permission bit
+                        if (Files.isExecutable(entry)) {
+                            executableNames.add(entry.getFileName().toString());
+                        }
+                    }
+                }
+            } catch (IOException e) {
+                // Permission denied or IO error on a specific folder; skip and continue
+            }
+        }
+
+        return executableNames;
     }
 }
