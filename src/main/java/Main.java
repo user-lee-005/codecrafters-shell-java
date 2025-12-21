@@ -11,6 +11,8 @@ import terminal.readers.TerminalReader;
 import terminal.renderer.Renderer;
 
 import java.io.*;
+import java.util.ArrayList;
+import java.util.List;
 
 public class Main {
 
@@ -47,17 +49,32 @@ public class Main {
     }
 
     private static boolean executeAndExit(String input) throws IOException {
-        Parser commandParser = new CommandParser();
-        ParsedCommand parsedCommand = commandParser.parseCommand(input);
-        if(parsedCommand.isExit()) return true;
-        PrintStream printStream = parsedCommand.outputStrategy().get();
+        List<ParsedCommand> parsedCommands = getParsedCommands(input);
+        if(parsedCommands.getFirst().isExit()) return true;
+        PrintStream printStream = parsedCommands.getFirst().outputStrategy().get();
         try {
-            CommandRegistry.run(parsedCommand, printStream);
+            CommandRegistry.run(parsedCommands, printStream);
         } finally {
             if (printStream != System.out) {
                 printStream.close();
             }
         }
         return false;
+    }
+
+    private static List<ParsedCommand> getParsedCommands(String input) {
+        Parser commandParser = new CommandParser();
+        List<ParsedCommand> parsedCommands = new ArrayList<>();
+        if(input.contains("|")) {
+            String[] commands = input.split("\\|");
+            for(String command: commands) {
+                ParsedCommand parsedCommand = commandParser.parseCommand(command);
+                parsedCommands.add(parsedCommand);
+            }
+        } else {
+            ParsedCommand parsedCommand = commandParser.parseCommand(input);
+            parsedCommands.add(parsedCommand);
+        }
+        return parsedCommands;
     }
 }

@@ -43,66 +43,94 @@ public class CommandRegistry {
         }
     }
 
-    public static void runExternalCommand(ParsedCommand parsedCommand, PrintStream printStream) {
-        String path = System.getenv("PATH");
-        String command = parsedCommand.command();
-        String found = DirectoryScanner.findExecutable(command, path);
-
-        if (found == null) {
-            printStream.println(command + ": command not found");
-            return;
-        }
-
+    public static void runExternalCommand(List<ParsedCommand> parsedCommands, PrintStream printStream) {
         try {
-            runExternal(found, parsedCommand, printStream);
+            List<ProcessBuilder> builders = createProcessBuilders(parsedCommands);
+            executePipeline(builders, printStream);
+        } catch (IllegalArgumentException e) {
+            printStream.println(e.getMessage());
         } catch (Exception e) {
-            printStream.println(command + ": " + e.getMessage());
+            printStream.println("Execution Error: " + e.getMessage());
         }
     }
 
-    private static void runExternal(String execPath, ParsedCommand parsedCommand, PrintStream printStream) throws Exception {
-        String execName = Paths.get(execPath).getFileName().toString();
-        List<String> command = new ArrayList<>();
-        command.add(execName);
-        command.addAll(parsedCommand.args());
+    private static List<ProcessBuilder> createProcessBuilders(List<ParsedCommand> parsedCommands) {
+        List<ProcessBuilder> builders = new ArrayList<>();
+        String path = System.getenv("PATH");
+        for (ParsedCommand parsedCommand : parsedCommands) {
+            String command = parsedCommand.command();
+            String found = DirectoryScanner.findExecutable(command, path);
+            if (found == null) {
+                throw new IllegalArgumentException(command + ": command not found");
+            }
 
-        ProcessBuilder pb = new ProcessBuilder(command);
-        pb.directory(new File(execPath).getParentFile());
-        if (parsedCommand.stdErrRedirectFile() != null) {
-            pb.redirectError(parsedCommand.append() ?
-                    ProcessBuilder.Redirect.appendTo(
-                            new File(parsedCommand.stdErrRedirectFile()))
-                    : ProcessBuilder.Redirect.to(new File(parsedCommand.stdErrRedirectFile()))
-            );
-        } else {
-            pb.redirectError(ProcessBuilder.Redirect.INHERIT);
+            String execName = Paths.get(found).getFileName().toString();
+            List<String> cmdArgs = new ArrayList<>();
+            cmdArgs.add(execName);
+            cmdArgs.addAll(parsedCommand.args());
+
+            ProcessBuilder pb = new ProcessBuilder(cmdArgs);
+            pb.directory(new File(found).getParentFile());
+
+            if (parsedCommand.stdErrRedirectFile() != null) {
+                pb.redirectError(parsedCommand.append() ?
+                        ProcessBuilder.Redirect.appendTo(new File(parsedCommand.stdErrRedirectFile())) :
+                        ProcessBuilder.Redirect.to(new File(parsedCommand.stdErrRedirectFile()))
+                );
+            } else {
+                pb.redirectError(ProcessBuilder.Redirect.INHERIT);
+            }
+
+            builders.add(pb);
         }
+        return builders;
+    }
 
-        Process process = pb.start();
+    private static void executePipeline(List<ProcessBuilder> builders, PrintStream printStream) throws IOException, InterruptedException {
+        if (builders.isEmpty()) return;
+
+        // 1. Configure the "Input" of the Pipeline (First Process)
+        // The first command reads from the User's Keyboard (INHERIT)
+        builders.getFirst().redirectInput(ProcessBuilder.Redirect.INHERIT);
+
+        // 2. Configure the "Output" of the Pipeline (Last Process)
+        // The last command MUST pipe its output to Java so we can read it and print it
+        builders.getLast().redirectOutput(ProcessBuilder.Redirect.PIPE);
+
+        // 3. Start the Pipeline
+        // Java automatically connects the pipes between intermediate processes (0->1, 1->2)
+        List<Process> processes = ProcessBuilder.startPipeline(builders);
+
+        // 4. Read Output from the LAST process only
+        Process lastProcess = processes.getLast();
 
         try (BufferedReader reader = new BufferedReader(
-                new InputStreamReader(process.getInputStream()))) {
-
+                new InputStreamReader(lastProcess.getInputStream()))) {
             String line;
             while ((line = reader.readLine()) != null) {
                 printStream.println(line);
             }
         }
-    }
 
-    public static void run(ParsedCommand parsedCommand, PrintStream printStream) {
-        CommandHandler handler = handlers.get(parsedCommand.command());
+        // 5. Clean up: Wait for all processes to finish
+        for (Process p : processes) {
+            p.waitFor();
+        }
+    }
+    public static void run(List<ParsedCommand> parsedCommands, PrintStream printStream) {
+        CommandHandler handler = handlers.get(parsedCommands.getFirst().command());
         if(handler != null) {
-            if (parsedCommand.stdErrRedirectFile() != null) {
+            if (parsedCommands.getFirst().stdErrRedirectFile() != null) {
                 try {
-                    new FileOutputStream(parsedCommand.stdErrRedirectFile(), parsedCommand.append()).close();
+                    new FileOutputStream(parsedCommands.getFirst().stdErrRedirectFile(),
+                            parsedCommands.getFirst().append()).close();
                 } catch (IOException e) {
                     System.err.println(e.getMessage());
                 }
             }
-            handler.handle(parsedCommand, printStream);
+            handler.handle(parsedCommands.getFirst(), printStream);
             return;
         }
-        runExternalCommand(parsedCommand, printStream);
+        runExternalCommand(parsedCommands, printStream);
     }
 }

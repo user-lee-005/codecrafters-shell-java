@@ -80,7 +80,6 @@ public class CommandParser implements Parser {
         return result;
     }
 
-
     @Override
     public ParsedCommand parseCommand(String command) {
         List<String> tokens = tokenizeShellCommand(command);
