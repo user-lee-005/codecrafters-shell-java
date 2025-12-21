@@ -4,10 +4,14 @@ import dto.ParsedCommand;
 import utils.DirectoryScanner;
 
 import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Stream;
 
 import static constants.Constants.*;
 
@@ -173,9 +177,25 @@ public class CommandRegistry {
     }
 
     private static void handleHistory(ParsedCommand cmd, PrintStream printStream) {
+        Set<String> historyOptions = Set.of("-r");
         if(historyState.isEmpty()) return;
         StringBuilder sb = new StringBuilder();
-        int historySize = cmd.args().isEmpty() ? historyState.size() : Integer.parseInt(cmd.args().getFirst());
+        int historySize = historyState.size();
+        if(!cmd.args().isEmpty()) {
+            String arg = cmd.args().getFirst();
+            if(historyOptions.contains(arg)) {
+                if("-r".equals(arg)) {
+                    try (Stream<String> stream = Files.lines(Path.of(cmd.args().get(1)))) {
+                        stream.forEach(historyState::add);
+                    } catch (IOException e) {
+                        System.out.println("cat: " + cmd.args().get(1) + ": No such file or directory");
+                    }
+                    return;
+                }
+            } else {
+                historySize = Integer.parseInt(arg);
+            }
+        }
         for (int i = historyState.size() - historySize; i < historyState.size(); i++) {
             sb.append(String.format("%5d  %s%n", i + 1, historyState.get(i)));
         }
