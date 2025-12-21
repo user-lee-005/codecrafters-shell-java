@@ -2,6 +2,7 @@ package terminal.renderer;
 
 import utils.DirectoryScanner;
 
+import java.util.Iterator;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
@@ -36,6 +37,17 @@ public class CompletionEngine {
         }
         if (tabCount == 2) {
             return Optional.of(String.join("  ", matches));
+        } else {
+            Iterator<String> stringIterator = matches.iterator();
+            String longestCommonPrefix = stringIterator.next();
+            while (stringIterator.hasNext()) {
+                String next = stringIterator.next();
+                while (next.indexOf(longestCommonPrefix) != 0) {
+                    longestCommonPrefix = longestCommonPrefix.substring(0, longestCommonPrefix.length() - 1);
+                }
+            }
+            if(!longestCommonPrefix.isEmpty() && !longestCommonPrefix.equals(buffer))
+                return Optional.of(longestCommonPrefix);
         }
         return Optional.empty();
     }
