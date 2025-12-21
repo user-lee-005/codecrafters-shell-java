@@ -17,7 +17,8 @@ public class CommandRegistry {
             pwd, (_, _, out) -> out.println(DirectoryScanner.getWorkingDirectory()),
             cd, (cmd, _, _) -> DirectoryScanner.changeDirectory(cmd.args()),
             type, (cmd, _, out) -> handleType(cmd.args().isEmpty() ? "" : cmd.args().getFirst(), out),
-            exit, (_, _, _) -> System.exit(0)
+            exit, (_, _, _) -> System.exit(0),
+            history, (_, _, out) -> out.println()
     );
 
     public static void run(List<ParsedCommand> commands, PrintStream finalOutput) {
@@ -92,7 +93,7 @@ public class CommandRegistry {
                 try (PrintStream ps = new PrintStream(out)) {
                     handler.handle(cmd, in, ps);
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    System.out.println(e.getMessage());
                 }
             });
             t.start();

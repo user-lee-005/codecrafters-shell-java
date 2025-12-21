@@ -6,6 +6,7 @@ public class Constants {
     public static final String type = "type";
     public static final String pwd = "pwd";
     public static final String cd = "cd";
+    public static final String history = "history";
 
 
     public static final String redirectOperator = ">";
