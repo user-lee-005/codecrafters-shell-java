@@ -13,124 +13,151 @@ import static constants.Constants.*;
 
 public class CommandRegistry {
     private static final Map<String, CommandHandler> handlers = Map.of(
-        echo, (parsedCommand, printStream) -> printStream.println(String.join(" ", parsedCommand.args())),
-        pwd, (_, printStream) -> printStream.println(DirectoryScanner.getWorkingDirectory()),
-        type, (parsedCommand, printStream) -> handleType(parsedCommand.args().getFirst(), printStream),
-        cd, (parsedCommand, _) -> DirectoryScanner.changeDirectory(parsedCommand.args())
+            echo, (cmd, _, out) -> out.println(String.join(" ", cmd.args())),
+            pwd, (_, _, out) -> out.println(DirectoryScanner.getWorkingDirectory()),
+            cd, (cmd, _, _) -> DirectoryScanner.changeDirectory(cmd.args()),
+            type, (cmd, _, out) -> handleType(cmd.args().isEmpty() ? "" : cmd.args().getFirst(), out),
+            exit, (_, _, _) -> System.exit(0)
     );
 
+    public static void run(List<ParsedCommand> commands, PrintStream finalOutput) {
+        InputStream previousOutput = System.in;
+        List<Process> runningProcesses = new ArrayList<>();
+        List<Thread> activeThreads = new ArrayList<>();
 
-    private static void handleType(String arg, PrintStream printStream) {
-        if (arg.isEmpty()) {
-            printStream.println("type: missing operand");
-            return;
-        }
-
-        // built-in
-        if (handlers.containsKey(arg) || exit.equals(arg)) {
-            printStream.println(arg + " is a shell builtin");
-            return;
-        }
-
-        // PATH search
-        String path = System.getenv("PATH");
-        String found = DirectoryScanner.findExecutable(arg, path);
-
-        if (found != null) {
-            printStream.println(arg + " is " + found);
-        } else {
-            printStream.println(arg + ": not found");
-        }
-    }
-
-    public static void runExternalCommand(List<ParsedCommand> parsedCommands, PrintStream printStream) {
         try {
-            List<ProcessBuilder> builders = createProcessBuilders(parsedCommands);
-            executePipeline(builders, printStream);
-        } catch (IllegalArgumentException e) {
-            printStream.println(e.getMessage());
-        } catch (Exception e) {
-            printStream.println("Execution Error: " + e.getMessage());
-        }
-    }
+            for (int i = 0; i < commands.size(); i++) {
+                ParsedCommand cmd = commands.get(i);
+                boolean isLast = (i == commands.size() - 1);
+                OutputStream currentOutput;
+                InputStream nextInput = null;
+                if (isLast) {
+                    currentOutput = finalOutput;
+                } else {
+                    PipedInputStream snk = new PipedInputStream();
+                    nextInput = snk;
+                    currentOutput = new PipedOutputStream(snk);
+                }
 
-    private static List<ProcessBuilder> createProcessBuilders(List<ParsedCommand> parsedCommands) {
-        List<ProcessBuilder> builders = new ArrayList<>();
-        String path = System.getenv("PATH");
-        for (ParsedCommand parsedCommand : parsedCommands) {
-            String command = parsedCommand.command();
-            String found = DirectoryScanner.findExecutable(command, path);
-            if (found == null) {
-                throw new IllegalArgumentException(command + ": command not found");
-            }
+                // --- EXECUTION ---
+                if (handlers.containsKey(cmd.command())) {
+                    if (cmd.stdErrRedirectFile() != null) {
+                        try {
+                            new FileOutputStream(cmd.stdErrRedirectFile(), cmd.append()).close();
+                        } catch (IOException e) {
+                            finalOutput.println("Error creating redirection file: " + e.getMessage());
+                        }
+                    }
+                    handleBuiltin(cmd, previousOutput, currentOutput, isLast, activeThreads);
+                } else {
+                    ProcessBuilder pb = createBuilder(cmd);
+                    Process p = pb.start();
+                    runningProcesses.add(p);
 
-            String execName = Paths.get(found).getFileName().toString();
-            List<String> cmdArgs = new ArrayList<>();
-            cmdArgs.add(execName);
-            cmdArgs.addAll(parsedCommand.args());
+                    // 1. Handle Input (Feed previous command's output to this process)
+                    if (previousOutput != System.in) {
+                        // Threaded bridge for input to avoid deadlock
+                        bridgeStreamsThreaded(previousOutput, p.getOutputStream(), activeThreads);
+                    }
 
-            ProcessBuilder pb = new ProcessBuilder(cmdArgs);
-            pb.directory(new File(found).getParentFile());
-
-            if (parsedCommand.stdErrRedirectFile() != null) {
-                pb.redirectError(parsedCommand.append() ?
-                        ProcessBuilder.Redirect.appendTo(new File(parsedCommand.stdErrRedirectFile())) :
-                        ProcessBuilder.Redirect.to(new File(parsedCommand.stdErrRedirectFile()))
-                );
-            } else {
-                pb.redirectError(ProcessBuilder.Redirect.INHERIT);
-            }
-
-            builders.add(pb);
-        }
-        return builders;
-    }
-
-    private static void executePipeline(List<ProcessBuilder> builders, PrintStream printStream) throws IOException, InterruptedException {
-        if (builders.isEmpty()) return;
-
-        // 1. Configure the "Input" of the Pipeline (First Process)
-        // The first command reads from the User's Keyboard (INHERIT)
-        builders.getFirst().redirectInput(ProcessBuilder.Redirect.INHERIT);
-
-        // 2. Configure the "Output" of the Pipeline (Last Process)
-        // The last command MUST pipe its output to Java so we can read it and print it
-        builders.getLast().redirectOutput(ProcessBuilder.Redirect.PIPE);
-
-        // 3. Start the Pipeline
-        // Java automatically connects the pipes between intermediate processes (0->1, 1->2)
-        List<Process> processes = ProcessBuilder.startPipeline(builders);
-
-        // 4. Read Output from the LAST process only
-        Process lastProcess = processes.getLast();
-
-        try (BufferedReader reader = new BufferedReader(
-                new InputStreamReader(lastProcess.getInputStream()))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                printStream.println(line);
-            }
-        }
-
-        // 5. Clean up: Wait for all processes to finish
-        for (Process p : processes) {
-            p.waitFor();
-        }
-    }
-    public static void run(List<ParsedCommand> parsedCommands, PrintStream printStream) {
-        CommandHandler handler = handlers.get(parsedCommands.getFirst().command());
-        if(handler != null) {
-            if (parsedCommands.getFirst().stdErrRedirectFile() != null) {
-                try {
-                    new FileOutputStream(parsedCommands.getFirst().stdErrRedirectFile(),
-                            parsedCommands.getFirst().append()).close();
-                } catch (IOException e) {
-                    System.err.println(e.getMessage());
+                    // 2. Handle Output
+                    if (isLast) {
+                        // CRITICAL FIX: Block the Main Thread here!
+                        // We do NOT spawn a thread for the final output.
+                        // We read it right here, ensuring we don't return until it's done.
+                        copyStream(p.getInputStream(), currentOutput);
+                    } else {
+                        // Intermediate command: Use a thread so we can move to the next loop iteration
+                        bridgeStreamsThreaded(p.getInputStream(), currentOutput, activeThreads);
+                    }
+                }
+                if (nextInput != null) {
+                    previousOutput = nextInput;
                 }
             }
-            handler.handle(parsedCommands.getFirst(), printStream);
-            return;
+            for (Process p : runningProcesses) p.waitFor();
+            for (Thread t : activeThreads) t.join();
+        } catch (Exception e) {
+            finalOutput.println(e.getMessage());
         }
-        runExternalCommand(parsedCommands, printStream);
+    }
+
+    private static void handleBuiltin(ParsedCommand cmd, InputStream in, OutputStream out, boolean isLast, List<Thread> threads) {
+        CommandHandler handler = handlers.get(cmd.command());
+
+        if (isLast) {
+            handler.handle(cmd, in, new PrintStream(out));
+        } else {
+            Thread t = new Thread(() -> {
+                try (PrintStream ps = new PrintStream(out)) {
+                    handler.handle(cmd, in, ps);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            });
+            t.start();
+            threads.add(t);
+        }
+    }
+
+    private static void copyStream(InputStream in, OutputStream out) throws IOException {
+        try (in) {
+            byte[] buffer = new byte[8192];
+            int n;
+            while ((n = in.read(buffer)) != -1) {
+                out.write(buffer, 0, n);
+                out.flush();
+            }
+        }
+    }
+
+    private static void bridgeStreamsThreaded(InputStream in, OutputStream out, List<Thread> threads) {
+        Thread t = new Thread(() -> {
+            try (in; out) {
+                byte[] buffer = new byte[8192];
+                int n;
+                while ((n = in.read(buffer)) != -1) {
+                    out.write(buffer, 0, n);
+                    out.flush();
+                }
+            } catch (IOException e) {
+                // Ignore broken pipes (common in pipelines)
+            }
+        });
+        t.start();
+        threads.add(t);
+    }
+
+    private static ProcessBuilder createBuilder(ParsedCommand parsedCommand) {
+        String path = System.getenv("PATH");
+        String found = DirectoryScanner.findExecutable(parsedCommand.command(), path);
+        if (found == null) throw new IllegalArgumentException(parsedCommand.command() + ": command not found");
+
+        String execName = Paths.get(found).getFileName().toString();
+        List<String> cmdArgs = new ArrayList<>();
+        cmdArgs.add(execName);
+        cmdArgs.addAll(parsedCommand.args());
+
+        ProcessBuilder pb = new ProcessBuilder(cmdArgs);
+        pb.directory(new File(found).getParentFile());
+
+        if (parsedCommand.stdErrRedirectFile() != null) {
+            pb.redirectError(parsedCommand.append() ?
+                    ProcessBuilder.Redirect.appendTo(new File(parsedCommand.stdErrRedirectFile())) :
+                    ProcessBuilder.Redirect.to(new File(parsedCommand.stdErrRedirectFile()))
+            );
+        } else {
+            pb.redirectError(ProcessBuilder.Redirect.INHERIT);
+        }
+
+        return pb;
+    }
+
+    private static void handleType(String arg, PrintStream printStream) {
+        if (arg.isEmpty()) { printStream.println("missing operand"); return; }
+        if (handlers.containsKey(arg)) { printStream.println(arg + " is a shell builtin"); return; }
+        String found = DirectoryScanner.findExecutable(arg, System.getenv("PATH"));
+        if (found != null) printStream.println(arg + " is " + found);
+        else printStream.println(arg + ": not found");
     }
 }
