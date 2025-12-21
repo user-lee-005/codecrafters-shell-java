@@ -1,11 +1,13 @@
 package terminal.controller;
 
+import handlers.CommandRegistry;
 import terminal.KeyEvent;
 import terminal.KeyType;
 import terminal.buffer.InputBuffer;
 import terminal.renderer.CompletionEngine;
 import terminal.renderer.Renderer;
 
+import java.util.List;
 import java.util.Optional;
 
 public class InputController {
@@ -14,10 +16,15 @@ public class InputController {
     private final Renderer renderer;
     private final CompletionEngine completionEngine = new CompletionEngine();
     private int tabCount = 0;
+    private int historyIndex = 0;
 
     public InputController(InputBuffer buffer, Renderer renderer) {
         this.buffer = buffer;
         this.renderer = renderer;
+    }
+
+    public void setHistoryIndex(int index) {
+        historyIndex = index;
     }
 
     public void handle(KeyEvent event) {
@@ -38,13 +45,32 @@ public class InputController {
 
             case ENTER -> {
                 renderer.newLine();
-                // execution happens outside
             }
 
             case TAB -> handleTab();
 
+            case UPARROW, DOWNARROW -> handleArrows(event);
+
             default -> {
                 // ignore
+            }
+        }
+    }
+
+    private void handleArrows(KeyEvent event) {
+        List<String> history = CommandRegistry.getHistory();
+        if (history.isEmpty()) return;
+        if(KeyType.UPARROW.equals(event.keyType())) {
+            if (historyIndex > 0) {
+                historyIndex--;
+                renderer.printString("\r$ " + history.get(historyIndex) + "\033[0K");
+            }
+        } else {
+            if (historyIndex < history.size()) {
+                historyIndex++;
+                if (!(historyIndex >= history.size())) {
+                    renderer.printString("\r$ " + history.get(historyIndex) + "\033[0K");
+                }
             }
         }
     }

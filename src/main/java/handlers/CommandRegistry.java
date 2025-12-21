@@ -27,6 +27,10 @@ public class CommandRegistry {
         historyState.add(input);
     }
 
+    public static List<String> getHistory() {
+        return historyState;
+    }
+
     public static void run(List<ParsedCommand> commands, PrintStream finalOutput) {
         InputStream previousOutput = System.in;
         List<Process> runningProcesses = new ArrayList<>();

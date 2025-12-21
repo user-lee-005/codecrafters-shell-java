@@ -6,5 +6,7 @@ public enum KeyType {
     ENTER,
     BACKSPACE,
     EOF,
+    UPARROW,
+    DOWNARROW,
     UNKNOWN
 }

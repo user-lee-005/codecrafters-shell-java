@@ -28,6 +28,7 @@ public class Main {
                 System.out.flush();
 
                 buffer.clear();
+                controller.setHistoryIndex(CommandRegistry.getHistory().size());
 
                 while (true) {
                     KeyEvent event = terminal.readKey();

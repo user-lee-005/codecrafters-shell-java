@@ -5,4 +5,5 @@ public interface Renderer {
     void eraseChar();
     void printString(String string);
     void newLine();
+    void clearLine();
 }

@@ -24,4 +24,13 @@ public class UnixRenderer implements Renderer {
         System.out.print("\n");
         System.out.flush();
     }
+
+    @Override
+    public void clearLine() {
+        // Clear entire line
+        System.out.print("\u001B[3K");
+        // Move cursor to column 0
+        System.out.print("\u001B[3G");
+        System.out.flush();
+    }
 }
