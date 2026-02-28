@@ -1,5 +1,6 @@
 package terminal.renderer;
 
+import dto.TrieNode;
 import utils.DirectoryScanner;
 
 import java.util.Iterator;
@@ -15,13 +16,24 @@ public class CompletionEngine {
     private static final Set<String> EXECUTABLES = DirectoryScanner.findAllExecutablesInPath();
 
     public Optional<String> complete(String buffer, int tabCount) {
-        // Only complete first token
-        if(buffer.contains(" ")) {
+        String[] tokens = buffer.split(" ");
+        boolean completeCommand = tokens.length == 1 && !buffer.endsWith(" ");
+        if(completeCommand) {
+            Optional<String> builtInCommand = completeBuiltIns(buffer);
+            if (builtInCommand.isPresent()) return builtInCommand;
+            return completeExecutables(buffer, tabCount);
+        }
+        return completeFileNames(tokens);
+    }
+
+    private Optional<String> completeFileNames(String[] tokens) {
+        if (tokens == null || tokens.length != 2) {
             return Optional.empty();
         }
-        Optional<String> builtInCommand = completeBuiltIns(buffer);
-        if (builtInCommand.isPresent()) return builtInCommand;
-        return completeExecutables(buffer, tabCount);
+        String filePrefix = tokens[1];
+        TrieNode filesPresentInCwd = DirectoryScanner.findAllFilesInTheCurrentDirectory();
+        String fileName = filesPresentInCwd.getAutoCompletedWord(filePrefix);
+        return fileName.isEmpty() ? Optional.empty() : Optional.of(fileName);
     }
 
     private Optional<String> completeExecutables(String buffer, int tabCount) {
@@ -38,18 +50,24 @@ public class CompletionEngine {
         if (tabCount == 2) {
             return Optional.of(String.join("  ", matches));
         } else {
-            Iterator<String> stringIterator = matches.iterator();
-            String longestCommonPrefix = stringIterator.next();
-            while (stringIterator.hasNext()) {
-                String next = stringIterator.next();
-                while (next.indexOf(longestCommonPrefix) != 0) {
-                    longestCommonPrefix = longestCommonPrefix.substring(0, longestCommonPrefix.length() - 1);
-                }
-            }
-            if(!longestCommonPrefix.isEmpty() && !longestCommonPrefix.equals(buffer))
-                return Optional.of(longestCommonPrefix);
+            Optional<String> longestCommonPrefix = getLongestCommonPrefix(buffer, matches);
+            if (longestCommonPrefix.isPresent()) return longestCommonPrefix;
         }
         return Optional.empty();
+    }
+
+    private static Optional<String> getLongestCommonPrefix(String buffer, Set<String> matches) {
+        Iterator<String> stringIterator = matches.iterator();
+        String longestCommonPrefix = stringIterator.next();
+        while (stringIterator.hasNext()) {
+            String next = stringIterator.next();
+            while (next.indexOf(longestCommonPrefix) != 0) {
+                longestCommonPrefix = longestCommonPrefix.substring(0, longestCommonPrefix.length() - 1);
+            }
+        }
+        return (longestCommonPrefix.isEmpty() || longestCommonPrefix.equals(buffer))
+                ? Optional.empty()
+                : Optional.of(longestCommonPrefix);
     }
 
     private static Optional<String> completeBuiltIns(String buffer) {

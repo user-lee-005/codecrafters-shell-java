@@ -1,5 +1,7 @@
 package utils;
 
+import dto.TrieNode;
+
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.DirectoryStream;
@@ -15,6 +17,7 @@ import static constants.Constants.cd;
 
 public class DirectoryScanner {
     private static String currentDir = Paths.get("").toAbsolutePath().toString();
+
     public static String findExecutable(String command, String pathList) {
         if (pathList == null || pathList.isBlank()) return null;
 
@@ -156,5 +159,19 @@ public class DirectoryScanner {
         }
 
         return executableNames;
+    }
+
+    public static TrieNode findAllFilesInTheCurrentDirectory() {
+        Path currentDirPath = Paths.get(getWorkingDirectory());
+        TrieNode fileNames = new TrieNode();
+        try(DirectoryStream<Path> stream = Files.newDirectoryStream(currentDirPath)) {
+            for(Path file: stream) {
+                if(!Files.isRegularFile(file)) continue;
+                fileNames.insert(file.getFileName().toString());
+            }
+        } catch (IOException e) {
+            // Permission denied or IO error on a specific folder; skip and continue
+        }
+        return fileNames;
     }
 }

@@ -87,9 +87,16 @@ public class InputController {
 
         completedString.ifPresent(completion -> {
             if(tabCount < 2) {
-                String suffix = completion.substring(content.length());
-                buffer.append(suffix);
-                renderer.printString(suffix);
+                if(content.contains(" ")) {
+                    String filePrefix = content.split(" ")[1];
+                    String suffix = completion.substring(filePrefix.length());
+                    buffer.append(suffix);
+                    renderer.printString(suffix);
+                } else {
+                    String suffix = completion.substring(content.length());
+                    buffer.append(suffix);
+                    renderer.printString(suffix);
+                }
             } else {
                 renderer.newLine();
                 renderer.printString(completion);
